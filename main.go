@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"github.com/PuerkitoBio/goquery"
+	"github.com/antchfx/htmlquery"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
@@ -23,10 +26,34 @@ func main() {
 	if err != nil {
 		log.Printf("read content failed,%v", err)
 	}
+	// 正则表达式提取
 	matches := headerRe.FindAllSubmatch(body, -1)
 	for _, match := range matches {
 		fmt.Println("fetch card news:", string(match[1]))
 	}
+
+	// xpath匹配提取
+	// 解析 HTML 文本
+	doc, err := htmlquery.Parse(bytes.NewReader(body))
+	if err != nil {
+		fmt.Printf("htmlquery Parse failed,err:%v", err)
+	}
+	// 通过 XPath 语法查找符合条件的节点
+	nodes := htmlquery.Find(doc, `//div[@class="small_cardcontent__BTALp"]//h2	`)
+	for _, node := range nodes {
+		fmt.Println("fetch card ", node.FirstChild.Data)
+	}
+	// Css选择器匹配提取
+	// 加载HTML文档
+	cssDoc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		fmt.Println("read content failed,err:%v", err)
+	}
+	cssDoc.Find("div.small_cardcontent__BTALp h2").Each(func(i int, selection *goquery.Selection) {
+		// 获取匹配标签中的文本
+		title := selection.Text()
+		fmt.Printf("Review %d: %s\n", i, title)
+	})
 	numLinks := strings.Count(string(body), "<a")
 	fmt.Printf("homepage has %d links!\n", numLinks)
 
