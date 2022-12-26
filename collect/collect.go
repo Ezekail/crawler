@@ -3,6 +3,7 @@ package collect
 import (
 	"bufio"
 	"fmt"
+	"github.com/Ezekail/crawler.git/proxy"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
@@ -40,6 +41,7 @@ func (b *BaseFetch) Get(url string) ([]byte, error) {
 
 type BrowserFetch struct {
 	Timeout time.Duration
+	Proxy   proxy.ProxyFunc
 }
 
 // Get 模拟浏览器访问
@@ -47,6 +49,12 @@ func (b BrowserFetch) Get(url string) ([]byte, error) {
 	// 创建一个 HTTP 客户端 http.Client
 	client := &http.Client{
 		Timeout: b.Timeout,
+	}
+	// 更新 http.Client 变量中的 Transport 结构中的 Proxy 函数，将其替换为我们自定义的代理函数
+	if b.Proxy != nil {
+		transport := http.DefaultTransport.(*http.Transport)
+		transport.Proxy = b.Proxy
+		client.Transport = transport
 	}
 	// 然后通过 http.NewRequest 创建一个请求
 	request, err := http.NewRequest("Get", url, nil)
