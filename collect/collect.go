@@ -14,15 +14,15 @@ import (
 )
 
 type Fetcher interface {
-	Get(url string) ([]byte, error)
+	Get(url *Request) ([]byte, error)
 }
 
 type BaseFetch struct {
 }
 
 // Get 获取网页的内容，检测网页的字符编码并将文本统一转换为 UTF-8 格式
-func (b *BaseFetch) Get(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+func (b *BaseFetch) Get(req *Request) ([]byte, error) {
+	resp, err := http.Get(req.Url)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -45,7 +45,7 @@ type BrowserFetch struct {
 }
 
 // Get 模拟浏览器访问
-func (b BrowserFetch) Get(url string) ([]byte, error) {
+func (b BrowserFetch) Get(req *Request) ([]byte, error) {
 	// 创建一个 HTTP 客户端 http.Client
 	client := &http.Client{
 		Timeout: b.Timeout,
@@ -57,10 +57,15 @@ func (b BrowserFetch) Get(url string) ([]byte, error) {
 		client.Transport = transport
 	}
 	// 然后通过 http.NewRequest 创建一个请求
-	request, err := http.NewRequest("Get", url, nil)
+	request, err := http.NewRequest("Get", req.Url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("get url failed,err:%v\n", err)
 	}
+	// 在Request中添加Cookie
+	if len(req.Cookie) > 0 {
+		request.Header.Set("Cookie", req.Cookie)
+	}
+
 	// 在请求中调用 req.Header.Set 设置 User-Agent 请求头
 	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36")
 	// 最后调用 client.Do 完成 HTTP 请求
