@@ -9,7 +9,7 @@ import (
 
 // 负责专门处理代理相关的操作
 
-type ProxyFunc func(r *http.Request) (*url.URL, error)
+type ProxyFunc func(*http.Request) (*url.URL, error)
 
 type roundRobinSwitcher struct {
 	proxyURLs []*url.URL
