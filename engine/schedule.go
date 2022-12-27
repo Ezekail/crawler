@@ -5,17 +5,31 @@ import (
 	"go.uber.org/zap"
 )
 
-type ScheduleEngine struct {
+type Schedule struct {
 	requestCh chan *collect.Request    // 负责接收请求
 	workCh    chan *collect.Request    // 负责分配任务给 worker
 	out       chan collect.ParseResult // 负责处理爬取后的数据
-	WorkCount int                      // 执行任务的数量
+	options
+}
+
+type Config struct {
+	WorkCount int // 执行任务的数量
 	Fetcher   collect.Fetcher
 	Logger    *zap.Logger
 	Seeds     []*collect.Request
 }
 
-func (s *ScheduleEngine) Run() {
+func NewSchedule(opts ...Option) *Schedule {
+	options := defaultOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	s := &Schedule{}
+	s.options = options
+	return s
+}
+
+func (s *Schedule) Run() {
 	requestCh := make(chan *collect.Request)
 	workCh := make(chan *collect.Request)
 	out := make(chan collect.ParseResult)
@@ -31,7 +45,7 @@ func (s *ScheduleEngine) Run() {
 }
 
 // Schedule 创建调度程序，接收任务并完成任务的调度
-func (s *ScheduleEngine) Schedule() {
+func (s *Schedule) Schedule() {
 	var reqQueue = s.Seeds
 	for {
 		var req *collect.Request
@@ -53,7 +67,7 @@ func (s *ScheduleEngine) Schedule() {
 }
 
 // CreateWork 创建指定数量的 worker，完成实际任务的处理
-func (s *ScheduleEngine) CreateWork() {
+func (s *Schedule) CreateWork() {
 	for {
 		//接收到调度器分配的任务
 		r := <-s.workCh
@@ -73,7 +87,7 @@ func (s *ScheduleEngine) CreateWork() {
 }
 
 // HandleResult 创建数据处理协程，对爬取到的数据进行进一步处理
-func (s ScheduleEngine) HandleResult() {
+func (s Schedule) HandleResult() {
 	for {
 		select {
 		case result := <-s.out:
