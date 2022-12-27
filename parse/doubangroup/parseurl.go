@@ -16,9 +16,12 @@ func ParseURL(contents []byte, req *collect.Request) collect.ParseResult {
 	//匹配到符合帖子格式的 URL 我们把它组装到一个新的 Request 中，用作下一步的爬取
 	for _, m := range matches {
 		u := string(m[1])
+		// 在添加下一层的 URL 时，我们将 Depth 加 1
 		result.Requests = append(result.Requests, &collect.Request{
-			Url:    u,
-			Cookie: req.Cookie,
+			Url:      u,
+			Cookie:   req.Cookie,
+			Depth:    req.Depth + 1,
+			MaxDepth: req.MaxDepth,
 			ParseFunc: func(c []byte, request *collect.Request) collect.ParseResult {
 				return GetContent(c, u)
 			},

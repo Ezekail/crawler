@@ -76,9 +76,6 @@ func (b BrowserFetch) Get(req *Request) ([]byte, error) {
 	time.Sleep(req.WaitTime)
 
 	if err != nil {
-		b.Logger.Error("fetch failed",
-			zap.Error(err),
-		)
 		return nil, err
 	}
 

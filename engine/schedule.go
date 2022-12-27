@@ -71,8 +71,22 @@ func (s *Schedule) CreateWork() {
 	for {
 		//接收到调度器分配的任务
 		r := <-s.workCh
+		// 检查是否超过最大爬取深度
+		if err := r.Check(); err != nil {
+			s.Logger.Error("check failed",
+				zap.Error(err),
+			)
+			continue
+		}
 		// 访问服务器
 		body, err := s.Fetcher.Get(r)
+		if len(body) < 6000 {
+			s.Logger.Error("can't fetch ",
+				zap.Int("length", len(body)),
+				zap.String("url", r.Url),
+			)
+			continue
+		}
 		if err != nil {
 			s.Logger.Error("can't fetch",
 				zap.Error(err),
