@@ -3,6 +3,7 @@ package collect
 import (
 	"bufio"
 	"fmt"
+	"github.com/Ezekail/crawler.git/extensions"
 	"github.com/Ezekail/crawler.git/proxy"
 	"go.uber.org/zap"
 	"golang.org/x/net/html/charset"
@@ -67,6 +68,8 @@ func (b BrowserFetch) Get(req *Request) ([]byte, error) {
 	if len(req.Task.Cookie) > 0 {
 		request.Header.Set("Cookie", req.Task.Cookie)
 	}
+	// 将请求头设置为随机的 User-Agent
+	request.Header.Set("User-Agent", extensions.GenerateRandomUA())
 
 	// 在请求中调用 req.Header.Set 设置 User-Agent 请求头
 	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36")

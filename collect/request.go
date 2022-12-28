@@ -22,6 +22,7 @@ type Task struct {
 type Request struct {
 	unique    string
 	Task      *Task
+	Priority  int                                // 请求的优先级
 	Url       string                             // 要访问的网站
 	Method    string                             // 方法
 	Depth     int                                // 任务的当前深度
