@@ -8,7 +8,9 @@ import (
 	"time"
 )
 
+// Task 一个任务实例
 type Task struct {
+	Name        string // 用户界面显示的名称（应保证唯一性）
 	Url         string // 要访问的网站
 	Cookie      string
 	WaitTime    time.Duration // 默认等待时间
@@ -16,18 +18,26 @@ type Task struct {
 	RootReq     *Request      // 任务中的第一个请求
 	Reload      bool          // 网站是否可以重复爬取
 	Fetcher     Fetcher
+	Rule        RuleTree
 	Visited     map[string]bool
 	VisitedLock sync.Mutex
 }
 
+// Context 用于传递上下文信息
+type Context struct {
+	Body []byte   // 要解析的内容字节数组
+	Req  *Request // 当前的请求参数
+}
+
+// Request 单个请求
 type Request struct {
-	unique    string
-	Task      *Task
-	Priority  int                                // 请求的优先级
-	Url       string                             // 要访问的网站
-	Method    string                             // 方法
-	Depth     int                                // 任务的当前深度
-	ParseFunc func([]byte, *Request) ParseResult // 解析从网站获取到的网站信息
+	unique   string
+	Task     *Task
+	Priority int    // 请求的优先级
+	Url      string // 要访问的网站
+	Method   string // 方法
+	Depth    int    // 任务的当前深度
+	RuleName string
 }
 
 type ParseResult struct {

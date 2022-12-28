@@ -3,9 +3,31 @@ package engine
 import (
 	"fmt"
 	"github.com/Ezekail/crawler.git/collect"
+	"github.com/Ezekail/crawler.git/parse/doubangroup"
 	"go.uber.org/zap"
 	"sync"
 )
+
+// 初始化任务与规则
+func init() {
+	Store.Add(doubangroup.DoubangroupTask)
+}
+
+func (c *CrawlerStore) Add(task *collect.Task) {
+	c.hash[task.Name] = task
+	c.list = append(c.list, task)
+}
+
+// Store 全局爬虫任务实例
+var Store = &CrawlerStore{
+	list: []*collect.Task{},
+	hash: map[string]*collect.Task{},
+}
+
+type CrawlerStore struct {
+	list []*collect.Task
+	hash map[string]*collect.Task
+}
 
 type Crawler struct {
 	out         chan collect.ParseResult // 负责处理爬取后的数据
@@ -79,9 +101,14 @@ func (s *Schedule) Output() *collect.Request {
 func (c *Crawler) Schedule() {
 	var reqs []*collect.Request
 	for _, seed := range c.Seeds {
-		seed.RootReq.Task = seed
-		seed.RootReq.Url = seed.Url
-		reqs = append(reqs, seed.RootReq)
+		task := Store.hash[seed.Name]
+		task.Fetcher = seed.Fetcher
+		// 获取初始化任务
+		rootReqs := task.Rule.Root()
+		for _, req := range rootReqs {
+			req.Task = task
+		}
+		reqs = append(reqs, rootReqs...)
 	}
 	go c.scheduler.Schedule()
 	go c.scheduler.Push(reqs...)
@@ -139,16 +166,25 @@ func (c *Crawler) CreateWork() {
 				zap.Int("length", len(body)),
 				zap.String("url", r.Url),
 			)
+			c.SetFailure(r)
 			continue
 		}
 		if err != nil {
 			c.Logger.Error("can't fetch",
 				zap.Error(err),
 			)
+			c.SetFailure(r)
 			continue
 		}
 		// 解析服务器返回的数据
-		result := r.ParseFunc(body, r)
+		//获取当前任务对应的规则
+		rule := r.Task.Rule.Trunk[r.RuleName]
+		// 内容解析
+		result := rule.ParseFunc(&collect.Context{
+			Body: body,
+			Req:  r,
+		})
+		// 新的任务加入队列中
 		// 将返回的数据发送到 out 通道中，方便后续的处理
 		if len(result.Requests) > 0 {
 			go c.scheduler.Push(result.Requests...)
