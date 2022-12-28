@@ -11,6 +11,9 @@ type Crawler struct {
 	out         chan collect.ParseResult // 负责处理爬取后的数据
 	Visited     map[string]bool          // 存储请求访问信息
 	VisitedLock sync.Mutex               // 锁
+
+	failures    map[string]*collect.Request // 失败请求id -> 失败请求
+	failureLock sync.Mutex
 	options
 }
 
@@ -181,4 +184,23 @@ func (c *Crawler) StoreVisited(reqs ...*collect.Request) {
 		unique := req.Unique()
 		c.Visited[unique] = true
 	}
+}
+
+// SetFailure 当请求失败之后，将请求加入到 failures 哈希表中，并且把它重新交由调度引擎进行调度
+func (c *Crawler) SetFailure(req *collect.Request) {
+	//如果不可以重复爬取，我们需要在失败重试前删除 Visited 中的历史记录
+	if !req.Task.Reload {
+		c.VisitedLock.Lock()
+		unique := req.Unique()
+		delete(c.Visited, unique)
+		c.VisitedLock.Unlock()
+	}
+	c.failureLock.Lock()
+	defer c.failureLock.Unlock()
+	if _, ok := c.failures[req.Unique()]; !ok {
+		// 首次失败时，再重新执行一次
+		c.failures[req.Unique()] = req
+		c.scheduler.Push(req)
+	}
+	//todo: 失败2次，加载到失败队列中
 }

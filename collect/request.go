@@ -14,6 +14,7 @@ type Task struct {
 	WaitTime    time.Duration // 默认等待时间
 	MaxDepth    int           // 最大爬取深度
 	RootReq     *Request      // 任务中的第一个请求
+	Reload      bool          // 网站是否可以重复爬取
 	Fetcher     Fetcher
 	Visited     map[string]bool
 	VisitedLock sync.Mutex
