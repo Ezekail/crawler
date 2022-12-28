@@ -18,10 +18,10 @@ func ParseURL(contents []byte, req *collect.Request) collect.ParseResult {
 		u := string(m[1])
 		// 在添加下一层的 URL 时，我们将 Depth 加 1
 		result.Requests = append(result.Requests, &collect.Request{
-			Url:      u,
-			Cookie:   req.Cookie,
-			Depth:    req.Depth + 1,
-			MaxDepth: req.MaxDepth,
+			Method: "GET",
+			Url:    u,
+			Task:   req.Task,
+			Depth:  req.Depth + 1,
 			ParseFunc: func(c []byte, request *collect.Request) collect.ParseResult {
 				return GetContent(c, u)
 			},

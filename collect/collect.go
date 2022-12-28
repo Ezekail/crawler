@@ -64,8 +64,8 @@ func (b BrowserFetch) Get(req *Request) ([]byte, error) {
 		return nil, fmt.Errorf("get url failed,err:%v\n", err)
 	}
 	// 在Request中添加Cookie
-	if len(req.Cookie) > 0 {
-		request.Header.Set("Cookie", req.Cookie)
+	if len(req.Task.Cookie) > 0 {
+		request.Header.Set("Cookie", req.Task.Cookie)
 	}
 
 	// 在请求中调用 req.Header.Set 设置 User-Agent 请求头
@@ -73,7 +73,7 @@ func (b BrowserFetch) Get(req *Request) ([]byte, error) {
 	// 最后调用 client.Do 完成 HTTP 请求
 	response, err := client.Do(request)
 
-	time.Sleep(req.WaitTime)
+	time.Sleep(req.Task.WaitTime)
 
 	if err != nil {
 		return nil, err
