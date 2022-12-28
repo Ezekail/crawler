@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Ezekail/crawler.git/collect"
 	"github.com/Ezekail/crawler.git/parse/doubangroup"
+	"github.com/robertkrimen/otto"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -11,9 +12,101 @@ import (
 // 初始化任务与规则
 func init() {
 	Store.Add(doubangroup.DoubangroupTask)
+	Store.AddJSTask(doubangroup.DoubangroupJSTask)
 }
 
 func (c *CrawlerStore) Add(task *collect.Task) {
+	c.hash[task.Name] = task
+	c.list = append(c.list, task)
+}
+
+type mystruct struct {
+	Name string
+	Age  int
+}
+
+// AddJsReqs 用于动态规则添加请求。
+func AddJsReqs(jreqs []map[string]interface{}) []*collect.Request {
+	// 将在 JS 脚本中的请求数据变为 Go 结构中的数组[]*collect.Request
+	reqs := make([]*collect.Request, 0)
+
+	for _, jreq := range jreqs {
+		req := &collect.Request{}
+		u, ok := jreq["Url"].(string)
+		if !ok {
+			return nil
+		}
+		req.Url = u
+		req.RuleName, _ = jreq["RuleName"].(string)
+		req.Method, _ = jreq["Method"].(string)
+		req.Priority, _ = jreq["Priority"].(int)
+		reqs = append(reqs, req)
+	}
+	return reqs
+}
+
+// AddJsReq 用于动态规则添加单个请求。
+func AddJsReq(jreq map[string]interface{}) []*collect.Request {
+	reqs := make([]*collect.Request, 0)
+	req := &collect.Request{}
+	u, ok := jreq["Url"].(string)
+	if !ok {
+		return nil
+	}
+	req.Url = u
+	req.RuleName, _ = jreq["RuleName"].(string)
+	req.Method, _ = jreq["Method"].(string)
+	req.Priority, _ = jreq["Priority"].(int)
+	reqs = append(reqs, req)
+	return reqs
+}
+
+func (c *CrawlerStore) AddJSTask(m *collect.TaskModel) {
+	task := &collect.Task{
+		Property: m.Property,
+	}
+
+	task.Rule.Root = func() ([]*collect.Request, error) {
+		vm := otto.New()
+		vm.Set("AddJsReq", AddJsReqs)
+		v, err := vm.Eval(m.Root)
+		if err != nil {
+			return nil, err
+		}
+		e, err := v.Export()
+		if err != nil {
+			return nil, err
+		}
+		return e.([]*collect.Request), nil
+	}
+
+	for _, r := range m.Rules {
+		paesrFunc := func(parse string) func(ctx *collect.Context) (collect.ParseResult, error) {
+			return func(ctx *collect.Context) (collect.ParseResult, error) {
+				vm := otto.New()
+				vm.Set("ctx", ctx)
+				v, err := vm.Eval(parse)
+				if err != nil {
+					return collect.ParseResult{}, err
+				}
+				e, err := v.Export()
+				if err != nil {
+					return collect.ParseResult{}, err
+				}
+				if e == nil {
+					return collect.ParseResult{}, err
+				}
+				return e.(collect.ParseResult), err
+			}
+		}(r.ParseFunc)
+		if task.Rule.Trunk == nil {
+			task.Rule.Trunk = make(map[string]*collect.Rule, 0)
+		}
+		task.Rule.Trunk[r.Name] = &collect.Rule{
+			paesrFunc,
+		}
+	}
+
 	c.hash[task.Name] = task
 	c.list = append(c.list, task)
 }
@@ -104,7 +197,13 @@ func (c *Crawler) Schedule() {
 		task := Store.hash[seed.Name]
 		task.Fetcher = seed.Fetcher
 		// 获取初始化任务
-		rootReqs := task.Rule.Root()
+		rootReqs, err := task.Rule.Root()
+		if err != nil {
+			c.Logger.Error("get root failed",
+				zap.Error(err),
+			)
+			continue
+		}
 		for _, req := range rootReqs {
 			req.Task = task
 		}
@@ -180,10 +279,17 @@ func (c *Crawler) CreateWork() {
 		//获取当前任务对应的规则
 		rule := r.Task.Rule.Trunk[r.RuleName]
 		// 内容解析
-		result := rule.ParseFunc(&collect.Context{
+		result, err := rule.ParseFunc(&collect.Context{
 			Body: body,
 			Req:  r,
 		})
+		if err != nil {
+			c.Logger.Error("ParseFunc failed ",
+				zap.Error(err),
+				zap.String("url", r.Url),
+			)
+			continue
+		}
 		// 新的任务加入队列中
 		// 将返回的数据发送到 out 通道中，方便后续的处理
 		if len(result.Requests) > 0 {
